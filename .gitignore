@@ -1,0 +1,5 @@
+.env
+bin/
+*.log
+
+.claude/settings.local.json
