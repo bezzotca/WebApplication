@@ -1,50 +1,51 @@
-# WebProject
+# WebApplication
 
-Веб-приложение на Go, организованное по принципам чистой архитектуры.
+Минимальный веб-сервер на Go с PostgreSQL.
 
 ## Структура
 
 ```
 .
-├── cmd/app/main.go                  # Точка входа: сборка зависимостей (DI)
-├── config/                          # Загрузка конфигурации из окружения
-├── internal/
-│   ├── domain/                      # Сущности и бизнес-правила (ядро приложения)
-│   │   └── entity/
-│   ├── usecase/                     # Бизнес-логика + интерфейсы репозиториев (порты)
-│   ├── infrastructure/postgres/     # Реализация репозиториев поверх Postgres (адаптеры)
-│   └── delivery/http/               # Транспортный слой: handlers, router, middleware
-│       ├── handler/
-│       └── middleware/
-├── pkg/
-│   └── database/postgres/           # ИЗОЛИРОВАННОЕ ЯДРО подключения к PostgreSQL
-│       ├── config.go                 # Конфиг подключения (DSN)
-│       └── postgres.go               # Connect(): пул соединений, ping, таймауты
-├── migrations/                      # SQL-миграции
-├── deployments/docker/              # docker-compose для локального Postgres
-└── api/                             # Спецификации API (OpenAPI и т.п.)
+├── main.go             # точка входа: подключение к БД, роуты, запуск сервера
+├── handlers.go         # HTTP-хендлеры
+├── db.go               # пул соединений и SQL-запросы
+├── schema.sql          # схема БД
+├── docker-compose.yml  # локальный Postgres
+├── .env.example        # список переменных окружения
+└── go.mod
 ```
 
-## Правило зависимостей
-
-```
-delivery ──► usecase ──► domain
-                ▲
-infrastructure ─┘
-                ▲
-         pkg/database/postgres
-```
-
-- `domain` ничего не импортирует из других слоёв — чистые сущности и бизнес-ошибки.
-- `usecase` знает только интерфейсы (`UserRepository`), но не знает про Postgres, SQL, HTTP.
-- `infrastructure/postgres` — единственное место, где встречается SQL/pgx-типы; реализует интерфейсы `usecase`.
-- `delivery/http` вызывает usecase, ничего не знает о БД напрямую.
-- `pkg/database/postgres` — самостоятельное, переиспользуемое ядро: только открытие/проверка/закрытие пула соединений. Не содержит бизнес-логики и не зависит от остальных слоёв — поэтому вынесено в `pkg`, а не в `internal`.
+Всё в одном пакете `main`. Разбиение на файлы — только для читаемости: внутри пакета
+файлы видят друг друга без импортов, поэтому их можно свободно делить и объединять.
 
 ## Запуск
 
 ```bash
-cp .env.example .env
-docker compose -f deployments/docker/docker-compose.yml up -d
-go run ./cmd/app
+docker compose up -d
 ```
+
+```bash
+go mod tidy && go run .
+```
+
+## Проверка
+
+```bash
+curl localhost:8080/health
+```
+
+```bash
+curl -X POST localhost:8080/users -d '{"email":"a@b.c","name":"Alice"}'
+```
+
+```bash
+curl localhost:8080/users/1
+```
+
+## Эндпоинты
+
+| Метод | Путь         | Описание             |
+|-------|--------------|----------------------|
+| GET   | `/health`    | проверка живости     |
+| POST  | `/users`     | создать пользователя |
+| GET   | `/users/{id}`| получить по id       |
