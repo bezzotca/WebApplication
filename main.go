@@ -1,34 +1,43 @@
 package main
 
 import (
-	"context"
+	"fmt"
+	"html/template"
 	"log"
 	"net/http"
-	"os"
 )
 
-func main() {
-	ctx := context.Background()
+// Парсится один раз при старте: если файла нет, программа упадёт сразу
+// с понятным сообщением, а не паникой на первом запросе.
+var mainPage = template.Must(template.ParseFiles("Pages/HTML/Bootstrap/MainPage.html"))
 
-	pool, err := openDB(ctx)
-	if err != nil {
-		log.Fatal(err)
+func homePage(w http.ResponseWriter, r *http.Request) {
+	if err := mainPage.Execute(w, nil); err != nil {
+		log.Printf("render MainPage: %v", err)
 	}
-	defer pool.Close()
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", handleHealth)
-	mux.HandleFunc("POST /users", handleCreateUser(pool))
-	mux.HandleFunc("GET /users/{id}", handleGetUser(pool))
-
-	addr := ":" + env("HTTP_PORT", "8080")
-	log.Printf("listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
-func env(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
+func contactsPage(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "bbb")
+}
+
+func disciplinesPage(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "ccc")
+}
+
+func handleRequest() {
+	// Раздача файлов из папки Images: /Images/Logos/x.png -> Images/Logos/x.png
+	http.Handle("/Images/", http.StripPrefix("/Images/", http.FileServer(http.Dir("Images"))))
+
+	// "/{$}" — только корень. Без {$} шаблон "/" перехватывает все пути,
+	// и отсутствующие файлы возвращают HTML со статусом 200 вместо 404.
+	http.HandleFunc("/{$}", homePage)
+	http.HandleFunc("/contacts/", contactsPage)
+	http.HandleFunc("/disciplines/", disciplinesPage)
+	log.Println("listening on :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func main() {
+	handleRequest()
 }
